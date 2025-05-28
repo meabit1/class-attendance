@@ -28,9 +28,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {user?.name} ({user?.role})
-                </Button>
+                <Button variant="outline">{user?.name} (Teacher)</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleLogout}>

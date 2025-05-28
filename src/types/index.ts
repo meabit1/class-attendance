@@ -1,19 +1,24 @@
 export interface User {
-  id: string;
+  teacher_id: string | null;
+  admin_id: string | null;
   name: string;
-  email: string;
-  role: "admin" | "teacher";
-  password: string; // In a real app, this would be hashed
+  token: string;
 }
 export interface Group {
   id: string;
   name: string;
   description?: string;
+  year: AcademicYear;
   studentIds: string[];
   classIds: string[];
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type AcademicYear = {
+  id: string;
+  name: string;
+};
 
 export interface Student {
   id: string;
@@ -33,12 +38,11 @@ export interface Class {
 
 export interface Attendance {
   id: string;
-  studentId: string;
-  groupId: string;
-  classId: string;
   date: string;
-  status: "present" | "absent" | "late";
-  notes?: string;
+  group: string;
+  class: string;
+  academicYear: number;
+  records: AttendanceRecord[];
 }
 export interface Teacher {
   id: string;
@@ -48,11 +52,8 @@ export interface Teacher {
 
 export interface AttendanceRecord {
   id: string;
-  studentId: string;
-  classId: string;
-  date: string; // ISO format date string (YYYY-MM-DD)
+  studentName: string;
   status: AttendanceStatus;
-  notes?: string;
 }
 
 export interface AttendanceStats {
@@ -61,4 +62,4 @@ export interface AttendanceStats {
   absent: number;
   late: number;
 }
-export type AttendanceStatus = "present" | "absent" | "late";
+export type AttendanceStatus = "present" | "absent" | "unknown";

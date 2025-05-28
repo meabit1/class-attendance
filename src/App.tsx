@@ -1,4 +1,3 @@
-import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -17,8 +16,8 @@ import Layout from "./components/Layout";
 // Protected route component
 const ProtectedRoute = ({
   children,
-  allowedRoles,
-}: {
+}: // allowedRoles,
+{
   children: React.ReactNode;
   allowedRoles: string[];
 }) => {
@@ -28,7 +27,8 @@ const ProtectedRoute = ({
     return <div>Loading...</div>;
   }
 
-  if (!user || !allowedRoles.includes(user.role)) {
+  if (!user) {
+    //|| !allowedRoles.includes(user.role)
     return <Navigate to="/login" replace />;
   }
 
@@ -45,7 +45,8 @@ function AppRoutes() {
         element={
           user ? (
             <Navigate
-              to={user.role === "admin" ? "/admin" : "/teacher"}
+              // to={user.role === "admin" ? "/admin" : "/teacher"}
+              to={"/teacher"}
               replace
             />
           ) : (

@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
-import { Attendance, Class, Group, Student, Teacher } from "@/types";
+import {
+  Attendance,
+  Class,
+  Group,
+  Student,
+  Teacher,
+  AcademicYear,
+} from "@/types";
 import { DataContext } from "./DataContext";
+import api from "@/lib/api";
+import { useAuth } from "../auth/AuthContext";
 
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [classes, setClasses] = useState<Class[]>([]);
@@ -9,105 +18,115 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<
+    string | null
+  >(null);
+
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
+
+  const { user } = useAuth();
+
   // Load initial demo data
   useEffect(() => {
     // Sample classes
-    const initialClasses: Class[] = [
-      {
-        id: "1",
-        name: "Math 101",
-        teacherId: "1",
-        description: "Introduction to Mathematics",
-        groupIds: ["1"],
-      },
-      {
-        id: "2",
-        name: "Physics 101",
-        teacherId: "1",
-        description: "Introduction to Physics",
-        groupIds: ["2"],
-      },
-    ];
+
+    if (!user) return;
+
+    api.get(`/teacher/${user?.teacher_id}/subjects/`).then((response) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const initialClasses: Class[] = response.data.map((cls: any) => ({
+        id: cls.id,
+        name: cls.name,
+        teacherIds: cls.teachers || [],
+        groupIds: cls.groups || [],
+      }));
+      setClasses(initialClasses);
+      if (initialClasses.length > 0) {
+        setSelectedClassId(initialClasses[0].id);
+      }
+    });
+
+    api.get(`/teacher/${user?.teacher_id}/groups/`).then((response) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const initialGroups: Group[] = response.data.map((grp: any) => ({
+        id: grp.id,
+        name: grp.name,
+        year: grp.year,
+        speciality: grp.speciality,
+      }));
+      setGroups(initialGroups);
+      setAcademicYears([...initialGroups.map((group) => group.year)]);
+
+      if (initialGroups.length > 0) {
+        setSelectedGroupId(initialGroups[0].id);
+        setSelectedAcademicYear(initialGroups[0].year.id);
+      }
+    });
 
     // Sample students
-    const initialStudents: Student[] = [
-      {
-        id: "1",
-        name: "John Doe",
-        email: "john@example.com",
-        classId: "1",
-        groupId: "1", // Single group ID instead of array
-      },
-      {
-        id: "2",
-        name: "Jane Smith",
-        email: "jane@example.com",
-        classId: "1",
-        groupId: "1", // Same group as John
-      },
-      {
-        id: "3",
-        name: "Bob Johnson",
-        email: "bob@example.com",
-        classId: "2",
-        groupId: "2", // Different group
-      },
-    ];
+  }, [user]);
+  useEffect(() => {
+    if (!user || !selectedGroupId || !selectedClassId || !selectedAcademicYear)
+      return;
 
-    // Sample attendance
-    const initialAttendance: Attendance[] = [
-      {
-        id: "1",
-        studentId: "1",
-        classId: "1",
-        date: "2025-02-25",
-        status: "present",
-        groupId: "1",
-      },
-      {
-        id: "2",
-        studentId: "2",
-        classId: "1",
-        date: "2025-02-25",
-        status: "absent",
-        notes: "Sick leave",
-        groupId: "2",
-      },
-    ];
+    if (!isCapturing) {
+      api
+        .get(
+          `/teacher/${user?.teacher_id}/attendances/?group=${selectedGroupId}&subject=${selectedClassId}&academic_year=${selectedAcademicYear}`
+        )
+        .then((response) => {
+          const initialAttendance: Attendance[] = response.data.map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (attendance: any) => ({
+              id: attendance.id,
+              date: attendance.date,
+              group: attendance.group,
+              class: attendance.subject,
+              academicYear: attendance.academic_year,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              records: attendance.records.map((record: any) => ({
+                id: record.student,
+                studentName: record.student_name,
+                status: record.status,
+              })),
+            })
+          );
+          setAttendance(initialAttendance);
+        });
+    }
+    api
+      .get(
+        `students/filter/?group_id=${selectedGroupId}&year_id=${selectedAcademicYear}`
+      )
+      .then((response) => {
+        const initialStudents: Student[] = response.data.map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (student: any) => ({
+            id: student.id,
+            name: student.name,
+            email: student.email,
+            groupId: student.group,
+            photo: student.photo,
+            academicYear: student.academic_year,
+            speciality: student.speciality,
+          })
+        );
+        setStudents(initialStudents);
+      });
+  }, [
+    user,
+    selectedGroupId,
+    selectedClassId,
+    selectedAcademicYear,
+    isCapturing,
+  ]);
 
-    const initialTeachers: Teacher[] = [
-      {
-        id: "1",
-        name: "Teacher User",
-        email: "alice@example.com",
-      },
-    ];
-
-    const initialGroups: Group[] = [
-      {
-        id: "1",
-        name: "Advanced Math Group",
-        description: "For students excelling in math",
-        studentIds: ["1", "2"],
-        classIds: ["1"],
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "2",
-        name: "Physics Enthusiasts",
-        description: "Group for physics lovers",
-        studentIds: ["3"],
-        classIds: ["2"],
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    setClasses(initialClasses);
-    setStudents(initialStudents);
-    setAttendance(initialAttendance);
-    setTeachers(initialTeachers);
-    setGroups(initialGroups);
-  }, []);
+  // Function to mark attendance
+  const markAttandance = async () => {};
 
   // Group-related functions
   const addGroup = (group: Omit<Group, "id">) => {
@@ -280,86 +299,107 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     setTeachers([...teachers, teacherWithId]);
   };
 
-  const markAttendance = (attendanceData: Omit<Attendance, "id">) => {
-    const existingIndex = attendance.findIndex(
-      (a) =>
-        a.studentId === attendanceData.studentId &&
-        a.classId === attendanceData.classId &&
-        a.date === attendanceData.date
-    );
+  // const markAttendance = (attendanceData: Omit<Attendance, "id">) => {
+  //   const existingIndex = attendance.findIndex(
+  //     (a) =>
+  //       a.studentId === attendanceData.studentId &&
+  //       a.classId === attendanceData.classId &&
+  //       a.date === attendanceData.date
+  //   );
 
-    if (existingIndex >= 0) {
-      const updatedAttendance = [...attendance];
-      updatedAttendance[existingIndex] = {
-        ...updatedAttendance[existingIndex],
-        status: attendanceData.status,
-        notes: attendanceData.notes,
-      };
-      setAttendance(updatedAttendance);
-    } else {
-      const attendanceWithId = {
-        ...attendanceData,
-        id: Math.random().toString(36).substring(2, 9),
-      };
-      setAttendance([...attendance, attendanceWithId]);
-    }
-  };
+  //   if (existingIndex >= 0) {
+  //     const updatedAttendance = [...attendance];
+  //     updatedAttendance[existingIndex] = {
+  //       ...updatedAttendance[existingIndex],
+  //       status: attendanceData.status,
+  //       notes: attendanceData.notes,
+  //     };
+  //     setAttendance(updatedAttendance);
+  //   } else {
+  //     const attendanceWithId = {
+  //       ...attendanceData,
+  //       id: Math.random().toString(36).substring(2, 9),
+  //     };
+  //     setAttendance([...attendance, attendanceWithId]);
+  //   }
+  // };
 
   const getStudentsByClass = (classId: string) => {
+    console.log(students);
     return students.filter((student) => student.classId === classId);
   };
 
-  const getAttendanceByClass = (classId: string) => {
-    return attendance.filter((record) => record.classId === classId);
-  };
+  // const getAttendanceByClass = (classId: string) => {
+  //   return attendance.filter((record) => record.classId === classId);
+  // };
 
-  const getAttendanceStats = (classId: string) => {
-    const classAttendance = getAttendanceByClass(classId);
-    return {
-      total: classAttendance.length,
-      present: classAttendance.filter((a) => a.status === "present").length,
-      absent: classAttendance.filter((a) => a.status === "absent").length,
-      late: classAttendance.filter((a) => a.status === "late").length,
-    };
-  };
+  // const getAttendanceStats = (classId: string) => {
+  //   const classAttendance = getAttendanceByClass(classId);
+  //   return {
+  //     total: classAttendance.length,
+  //     present: classAttendance.filter((a) => a.status === "present").length,
+  //     absent: classAttendance.filter((a) => a.status === "absent").length,
+  //     late: classAttendance.filter((a) => a.status === "late").length,
+  //   };
+  // };
 
-  const getClassesForTeacher = (teacherId: string) => {
-    return classes.filter((c) => c.teacherId === teacherId);
+  const getClassesForTeacher = () => {
+    return classes;
   };
 
   const getTeacherById = (teacherId: string): Teacher | undefined => {
     return teachers.find((t) => t.id === teacherId);
   };
 
-  const getGroupsForTeacher = (teacherId: string) => {
-    return groups.filter((group) => {
-      const groupClasses = classes.filter((cls) =>
-        group.classIds.includes(cls.id)
-      );
-      return groupClasses.some((cls) => cls.teacherId === teacherId);
-    });
+  const getGroupsForTeacher = () => {
+    // return groups.filter((group) => {
+    //   const groupClasses = classes.filter((cls) =>
+    //     group.classIds.includes(cls.id)
+    //   );
+    //   return groupClasses.some((cls) => cls.teacherId === teacherId);
+    // });
+    return groups;
   };
 
   const getStudentsByGroup = (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return [];
-    return students.filter((student) => group.studentIds.includes(student.id));
+    console.log(students);
+    return students.filter((student) => student.groupId == groupId);
   };
 
-  const getAttendanceByGroup = (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return [];
-    return attendance.filter(
-      (record) =>
-        record.groupId === groupId ||
-        (record.classId && group.classIds.includes(record.classId))
-    );
+  // const getAttendanceByGroup = (groupId: string) => {
+  //   const group = groups.find((g) => g.id === groupId);
+  //   if (!group) return [];
+  //   return attendance.filter(
+  //     (record) =>
+  //       record.groupId === groupId ||
+  //       (record.classId && group.classIds.includes(record.classId))
+  //   );
+  // };
+
+  const getSelectedGroup = (): Group | undefined => {
+    return groups.find((group) => group.id === selectedGroupId);
+  };
+
+  const getSelectedClass = (): Class | undefined => {
+    return classes.find((cls) => cls.id === selectedClassId);
   };
 
   return (
     <DataContext.Provider
       value={{
+        getSelectedGroup,
+        getSelectedClass,
         // Existing values
+        isCapturing,
+        setIsCapturing,
+        markAttandance,
+        selectedGroupId,
+        setSelectedGroupId,
+        selectedClassId,
+        setSelectedClassId,
+        selectedAcademicYear,
+        setSelectedAcademicYear,
+
         addStudents,
         getTeacherById,
         addTeacher,
@@ -369,10 +409,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         attendance,
         addClass,
         addStudent,
-        markAttendance,
+        // markAttendance,
         getStudentsByClass,
-        getAttendanceByClass,
-        getAttendanceStats,
+        // getAttendanceByClass,
+        // getAttendanceStats,
         getClassesForTeacher,
 
         // Group-related values
@@ -386,8 +426,9 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
         // attandace
         getGroupsForTeacher,
-        getAttendanceByGroup,
+        // getAttendanceByGroup,
         getStudentsByGroup,
+        academicYears,
       }}
     >
       {children}
